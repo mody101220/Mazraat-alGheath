@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // General user profiles rules
+    match /users/{userId} {
+      allow read: if true; // Public listings & leaderboards need to read user info
+      allow create, update: if request.auth != null && request.auth.uid == userId
+                            && request.resource.data.coins >= 0 
+                            && request.resource.data.gems >= 0
+                            && request.resource.data.level >= 1;
+      allow delete: if false; // Users cannot delete their accounting profile
+    }
+
+    // Marketplace safety rules
+    match /market/{listingId} {
+      allow read: if true; // Everyone can find sales options
+      
+      // Creating listing locks
+      allow create: if request.auth != null 
+                    && request.resource.data.sellerId == request.auth.uid
+                    && request.resource.data.quantity > 0 
+                    && request.resource.data.price > 0;
+                    
+      // Only the seller can delete/retract their offer
+      allow delete: if request.auth != null && (
+        resource.data.sellerId == request.auth.uid  // Seller cancels
+        || request.resource == null                  // Successful buyer transaction
+      );
+      
+      allow update: if false; // Active listings cannot be manipulated post publish
+    }
+
+    // Chat room messaging limits
+    match /chat/{messageId} {
+      allow read: if true; // Everyone can see public village chatting
+      allow create: if request.auth != null 
+                    && request.resource.data.senderName != ""
+                    && request.resource.data.text.size() <= 120
+                    && request.resource.data.timestamp == request.time; // Anti-spoof timestamp
+      allow update, delete: if false; // Chat history is permanent & immutable
+    }
+
+    // Cached leaderboards
+    match /leaderboard/{docId} {
+      allow read: if true;
+      allow write: if false; // Read-only for standard users (updated by server function rules)
+    }
+
+    // Quests statistics
+    match /quests/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

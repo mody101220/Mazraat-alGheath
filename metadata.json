@@ -1,0 +1,6 @@
+{
+  "name": "مزرعة الغياث",
+  "description": "منصة سوق مزرعة الغياث الرقمية الذكية ولعبة المزرعة التفاعلية المتكاملة برعاية المهندس محمد جهاد الغياث",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
