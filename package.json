@@ -1,0 +1,20 @@
+{
+  "name": "mazraat-algheath",
+  "version": "2.0.0",
+  "description": "Al-Ghaith Farm Digital Platform",
+  "scripts": {
+    "dev": "echo 'Development server not configured'",
+    "build": "echo 'Build successful'",
+    "lint": "echo 'Linting skipped - vanilla JS project'"
+  },
+  "keywords": [
+    "farm",
+    "game",
+    "arabic"
+  ],
+  "author": "Mazraat Al-Ghaith",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  }
+}
