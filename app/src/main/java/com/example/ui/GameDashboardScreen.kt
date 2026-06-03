@@ -76,6 +76,7 @@ fun GameDashboardScreen(
     val orders by viewModel.allOrders.collectAsState()
 
     // Local UI states
+    var isWebGameplay by remember { mutableStateOf(true) }
     var activeTab by remember { mutableStateOf(0) } // 0: Farm, 1: Crops, 2: Market, 3: Quests & Ranking, 4: Settings
     var weatherState by remember { mutableStateOf("sunny") } // "sunny", "rainy", "cloudy_mist", "thunderstorm"
     var showAddProductDialog by remember { mutableStateOf(false) }
@@ -98,9 +99,13 @@ fun GameDashboardScreen(
 
     // Force RTL Arabic Layout direction
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = DeepNight,
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isWebGameplay) {
+                com.example.MainAppContent()
+            } else {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = DeepNight,
             topBar = {
                 // SECTION 1: HEADER (Top App Bar & Cash Balance)
                 GameTopHeader(
@@ -284,6 +289,29 @@ fun GameDashboardScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+
+            } // closes the else { ... } block parameter of isWebGameplay
+
+            // Dynamic floating switcher button in the bottom corner
+            FloatingActionButton(
+                onClick = { isWebGameplay = !isWebGameplay },
+                containerColor = if (isWebGameplay) FertileGreen else SunnyGold,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .testTag("toggle_gameplay_mode")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (isWebGameplay) "🚀 لوحة التحكم" else "🎮 المزرعة البصرية", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -199,7 +199,7 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col md:flex-row no-scrollbar">
+<body class="h-[100dvh] w-screen flex flex-col md:flex-row no-scrollbar overflow-hidden">
 
     <!-- Web App Canvas / HUD (Floating Rose Container overlay) -->
     <div id="rose-shower-container" class="absolute inset-0 pointer-events-none z-50 overflow-hidden"></div>
@@ -210,7 +210,7 @@
     </div>
 
     <!-- Main Mobile Shell Container -->
-    <div class="flex-1 flex flex-col h-full dashboard-glass-panel overflow-hidden max-w-md mx-auto border-x border-zinc-950 relative shadow-2xl">
+    <div class="flex-1 flex flex-col h-[100dvh] md:h-full dashboard-glass-panel overflow-hidden max-w-md mx-auto border-x border-zinc-950 relative shadow-2xl">
         
         <!-- WELCOME & LOGIN GATE SCREEN OVERLAY -->
         <div id="welcome-gate" class="absolute inset-0 z-50 flex flex-col welcome-bg overflow-y-auto no-scrollbar p-6 select-none transition-all duration-300">
@@ -555,6 +555,214 @@
             <!-- TAB 5: PROFILE & CONFIGURATOR (الملف والضبط ⚙️) -->
             <!-- ----------------------------------------- -->
             <section id="tab-profile" class="tab-content hidden flex-1 flex flex-col p-4 space-y-4">
+                <!-- WALLET CARD: SHAM CASH INTEGRATION (محفظة شام كاش الرقمية 💳) -->
+                <div class="glass-card p-4 rounded-3xl border border-emerald-900/15 shadow-xl relative overflow-hidden bg-gradient-to-br from-emerald-950/20 via-black/40 to-yellow-950/10">
+                    <!-- Tech overlay glow -->
+                    <div class="absolute -right-10 -top-10 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="absolute -left-10 -bottom-10 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                    <!-- Header -->
+                    <div class="flex justify-between items-center mb-3 border-b border-white/5 pb-2">
+                        <h3 class="text-xs font-black text-yellow-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-wallet text-emerald-400 animate-pulse"></i> 
+                            <span>محفظة الأرباح الرقمية (شام كاش)</span>
+                        </h3>
+                        <span id="wallet-auto-badge" class="text-[9px] bg-emerald-950/60 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span>تحويل تلقائي نشط</span>
+                        </span>
+                    </div>
+
+                    <!-- Wallet Setup & Info -->
+                    <div class="space-y-3">
+                        <!-- Provider logos grid -->
+                        <div class="grid grid-cols-5 gap-1.5 text-center">
+                            <button id="provider-sham" class="flex flex-col items-center justify-center p-1.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/40 text-[9px] font-bold text-emerald-300 transition-all transform active:scale-95" onclick="selectWalletProvider('sham_cash')">
+                                <span class="text-xs">💳</span>
+                                <span class="mt-0.5 leading-none text-[8px]">شام كاش</span>
+                            </button>
+                            <button id="provider-syriatel" class="flex flex-col items-center justify-center p-1.5 rounded-xl border border-white/5 bg-black/35 text-[9px] text-zinc-400 transition-all transform active:scale-95" onclick="selectWalletProvider('syriatel_cash')">
+                                <span class="text-xs">📱</span>
+                                <span class="mt-0.5 leading-none text-[8px]">سيريتل</span>
+                            </button>
+                            <button id="provider-mtn" class="flex flex-col items-center justify-center p-1.5 rounded-xl border border-white/5 bg-black/35 text-[9px] text-zinc-400 transition-all transform active:scale-95" onclick="selectWalletProvider('mtn_cash')">
+                                <span class="text-xs">📲</span>
+                                <span class="mt-0.5 leading-none text-[8px]">MTN كاش</span>
+                            </button>
+                            <button id="provider-usdt" class="flex flex-col items-center justify-center p-1.5 rounded-xl border border-white/5 bg-black/35 text-[9px] text-zinc-400 transition-all transform active:scale-95" onclick="selectWalletProvider('usdt_trc20')">
+                                <span class="text-xs">🪙</span>
+                                <span class="mt-0.5 leading-none text-[8px]">USDT</span>
+                            </button>
+                            <button id="provider-payeer" class="flex flex-col items-center justify-center p-1.5 rounded-xl border border-white/5 bg-black/35 text-[9px] text-zinc-400 transition-all transform active:scale-95" onclick="selectWalletProvider('payeer')">
+                                <span class="text-xs">🅿️</span>
+                                <span class="mt-0.5 leading-none text-[8px]">باير</span>
+                            </button>
+                        </div>
+
+                        <!-- Address Form -->
+                        <div class="bg-black/30 p-2.5 rounded-2xl border border-emerald-900/15">
+                            <div class="flex justify-between items-center mb-1.5 text-right font-sans" dir="rtl">
+                                <label class="text-[10px] text-zinc-300 font-bold">عنوان محفظتك النشطة:</label>
+                                <span class="text-[9px] text-yellow-500 font-extrabold" id="lbl-current-provider">شام كاش (سحابي مباشر)</span>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <input type="text" id="wallet-address-input" class="flex-1 bg-black/60 text-emerald-400 border border-emerald-700/35 rounded-xl px-2.5 py-1.5 text-[10px] font-mono outline-none focus:border-emerald-500" placeholder="أدخل عنوان محفظتك" value="f376fb5100b957b72e3c46d047f1f2de">
+                                <button id="btn-save-wallet" class="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-extrabold text-[10px] px-2.5 rounded-xl transition transform active:scale-95">ثبت العنوان</button>
+                            </div>
+                        </div>
+
+                        <!-- Config Toggles & Dynamic Balance Exchange Info -->
+                        <div class="grid grid-cols-2 gap-2 text-right font-sans" dir="rtl">
+                            <div class="bg-black/35 p-2 rounded-xl border border-white/5 flex flex-col justify-between">
+                                <span class="text-[9px] text-zinc-400 font-bold block mb-1">التحويل التلقائي الفوري 📡</span>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] text-zinc-300 font-black" id="lbl-auto-status">نشط فوري</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="wallet-auto-toggle" class="sr-only peer" checked>
+                                        <div class="w-7 h-4 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 after:border-zinc-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="bg-black/35 p-2 rounded-xl border border-white/5 flex flex-col justify-between">
+                                <span class="text-[9px] text-zinc-400 font-bold block mb-1">إجمالي الأرباح المحولة 💰</span>
+                                <span class="text-xs font-black text-emerald-400" id="wallet-withdrawn-amount">0 ل.س</span>
+                            </div>
+                        </div>
+
+                        <!-- Manual settlement option -->
+                        <div class="flex gap-2">
+                            <button id="btn-withdraw-now" class="w-full bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black font-black text-[10px] py-2.5 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-cloud-arrow-up text-[10px]"></i>
+                                <span>سحب الأرباح يدوياً الآن 🚀</span>
+                            </button>
+                        </div>
+
+                        <!-- Live Digital Ledger list of transfers -->
+                        <div class="text-right" dir="rtl">
+                            <span class="text-[10px] font-black text-zinc-300 mb-1.5 block">سجل تسويات الأرباح المباشرة:</span>
+                            <div id="wallet-ledger-container" class="space-y-1.5 max-h-[140px] overflow-y-auto no-scrollbar pr-1">
+                                <div class="text-[9px] text-zinc-500 text-center py-4 bg-black/20 rounded-xl border border-white/5">لا توجد عمليات تحويل مسجلة بعد. ابدأ بحصاد سنابل القمح الشامية لتوليد الأرباح! 🌾</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ----------------------------------------- -->
+                <!-- SOCIAL TASKS & REFERRALS BOARD (مهام الربح الاجتماعي ودعوة الأصدقاء 🚀) -->
+                <!-- ----------------------------------------- -->
+                <div class="glass-card p-4 rounded-3xl border border-emerald-900/15 shadow-xl relative overflow-hidden bg-gradient-to-br from-emerald-950/15 via-black/50 to-blue-950/10">
+                    <div class="absolute -right-10 -top-10 w-24 h-24 bg-yellow-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="absolute -left-10 -bottom-10 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+                    <!-- Header -->
+                    <div class="flex justify-between items-center mb-3 border-b border-white/5 pb-2">
+                        <h3 class="text-xs font-black text-yellow-500 flex items-center gap-1.5">
+                            <i class="fa-solid fa-gift text-yellow-400"></i>
+                            <span>بوابة المهام الاجتماعية ودعم التحالف الشامي 🌟</span>
+                        </h3>
+                        <span class="text-[9px] bg-yellow-500/10 text-yellow-400 px-2.5 py-0.5 rounded-full border border-yellow-500/25 font-bold">
+                            أرباح سريعة ومباشرة
+                        </span>
+                    </div>
+
+                    <!-- Direct Payout Social Channels -->
+                    <div class="space-y-2 text-right" dir="rtl">
+                        <span class="text-[10px] font-black text-zinc-300 block mb-1.5">1. اشترك بالقنوات الرسمية لتكسب الذهب الصافي فورياً:</span>
+                        
+                        <div class="grid grid-cols-1 gap-2">
+                            <!-- Youtube Task -->
+                            <div class="bg-black/30 p-2.5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-7 h-7 rounded-xl bg-rose-950/40 border border-rose-500/20 flex items-center justify-center text-xs">
+                                        <i class="fa-brands fa-youtube text-rose-500 text-sm"></i>
+                                    </span>
+                                    <div class="text-right">
+                                        <h4 class="text-[10px] font-black text-zinc-200">الاشتراك بقناة اليوتيوب الرسمية 📺</h4>
+                                        <p class="text-[8px] text-rose-300 leading-none">مكافأة فورية: +250 ذهبة (2,500 ل.س)</p>
+                                    </div>
+                                </div>
+                                <button id="btn-task-youtube" onclick="claimSocialTask('youtube', 'https://youtube.com/@mohamd421?si=_8w2UxVyGpwYxRrF')" class="bg-rose-600 hover:bg-rose-500 text-white font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1">
+                                    <span>اشتراك</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>
+                                </button>
+                            </div>
+
+                            <!-- TikTok Task -->
+                            <div class="bg-black/30 p-2.5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-7 h-7 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center text-xs">
+                                        <i class="fa-brands fa-tiktok text-cyan-400 text-xs"></i>
+                                    </span>
+                                    <div class="text-right">
+                                        <h4 class="text-[10px] font-black text-zinc-200">متابعة حساب التيكتوك المعتمد 🎵</h4>
+                                        <p class="text-[8px] text-cyan-300 leading-none">مكافأة فورية: +250 ذهبة (2,500 ل.س)</p>
+                                    </div>
+                                </div>
+                                <button id="btn-task-tiktok" onclick="claimSocialTask('tiktok', 'https://www.tiktok.com/@1.g.q?_r=1&_d=ek37b52b47edcb&sec_uid=MS4wLjABAAAA8NGZVhaxCNJpez4KGC4VREn1iRK81tqXvPPJSojVsX5qNdfn3HWJSxs78AZdqM_D&share_author_id=7008151461990220802&sharer_language=ar&source=h5_m&u_code=dki5fjg20ilae1&timestamp=1780489126&user_id=7008151461990220802&sec_user_id=MS4wLjABAAAA8NGZVhaxCNJpez4KGC4VREn1iRK81tqXvPPJSojVsX5qNdfn3HWJSxs78AZdqM_D&item_author_type=1&utm_source=copy&utm_campaign=client_share&utm_medium=android&share_iid=7645653187399517973&share_link_id=d7cfb339-7eb5-4262-8700-968b750e8295&share_app_id=1233&ugbiz_name=ACCOUNT&ug_btm=b8727%2Cb7360&social_share_type=5&enable_checksum=1')" class="bg-zinc-800 hover:bg-zinc-750 text-cyan-300 border border-cyan-500/20 font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1">
+                                    <span>متابعة</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>
+                                </button>
+                            </div>
+
+                            <!-- Telegram Task -->
+                            <div class="bg-black/30 p-2.5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-7 h-7 rounded-xl bg-sky-950/40 border border-sky-500/20 flex items-center justify-center text-xs">
+                                        <i class="fa-brands fa-telegram text-sky-400 text-sm"></i>
+                                    </span>
+                                    <div class="text-right">
+                                        <h4 class="text-[10px] font-black text-zinc-200">الانضمام لقناة التلغرام الرسمية 📢</h4>
+                                        <p class="text-[8px] text-sky-300 leading-none">مكافأة فورية: +250 ذهبة (2,500 ل.س)</p>
+                                    </div>
+                                </div>
+                                <button id="btn-task-telegram" onclick="claimSocialTask('telegram', 'https://t.me/asdy511')" class="bg-sky-600 hover:bg-sky-500 text-white font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1">
+                                    <span>انضمام</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Invite Friend System Section -->
+                        <div class="border-t border-white/5 pt-3 mt-1">
+                            <span class="text-[10px] font-black text-zinc-300 block mb-1.5">2. نظام دعوة الأصدقاء والربح المشترك 🤝📱:</span>
+                            
+                            <!-- Invitation Code generator/sharer -->
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div class="bg-black/40 p-2 rounded-xl border border-white/5">
+                                    <span class="text-[8px] text-zinc-400 block font-bold">كود دعوتك الشخصي:</span>
+                                    <div class="flex items-center justify-between mt-0.5">
+                                        <span id="lbl-my-invite-code" class="text-[10px] text-yellow-400 font-mono font-extrabold">SHAM-CODE</span>
+                                        <button onclick="copyMyInviteLink()" class="text-[8px] bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 px-1.5 py-0.5 rounded border border-yellow-500/25 transition">نسخ</button>
+                                    </div>
+                                </div>
+                                <div class="bg-black/40 p-2 rounded-xl border border-white/5">
+                                    <span class="text-[8px] text-zinc-400 block font-bold">الحصاد من الدعوات:</span>
+                                    <span id="lbl-total-referral-gains" class="text-[10px] text-emerald-400 font-black block mt-0.5">0 ل.س</span>
+                                </div>
+                            </div>
+
+                            <!-- Add Friend code to board -->
+                            <div class="bg-black/30 p-2.5 rounded-2xl border border-emerald-950/20 space-y-1.5">
+                                <div class="flex justify-between items-center text-[9px]">
+                                    <span class="text-zinc-300 font-semibold">هل تمت دعوتك؟ أدخل كود صديقك لربطه بلوحتك:</span>
+                                </div>
+                                <div class="flex gap-1.5">
+                                    <input type="text" id="friend-code-input" class="flex-1 bg-black/60 text-yellow-400 border border-yellow-500/20 rounded-xl px-2.5 py-1.5 text-[10px] font-mono outline-none focus:border-yellow-500" placeholder="مثال: SHAM-7281">
+                                    <button onclick="addFriendToBoard()" class="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black font-extrabold text-[9px] px-3.5 rounded-xl transition transform active:scale-95">ربط الصديق</button>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic Invited/Joined friends listed to board -->
+                            <div class="mt-2.5">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-[9px] font-black text-zinc-300">أصدقائي المدعوين بلوحة التحالف:</span>
+                                    <span id="referral-count-badge" class="text-[8px] bg-emerald-950/40 text-emerald-400 border border-emerald-500/20 px-2 py-0.2 rounded-full">0 مدعو</span>
+                                </div>
+                                <div id="referrals-board-container" class="space-y-1 max-h-[105px] overflow-y-auto no-scrollbar pr-0.5">
+                                    <!-- Dynamic list of joined friends -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Player identity form card -->
                 <div class="glass-card p-4 rounded-3xl border border-emerald-900/15 shadow-xl">
                     <h3 class="text-xs font-black text-yellow-500 mb-3 flex items-center gap-2"><i class="fa fa-user-circle"></i> ملف المزارع التعريفي للتحالف</h3>
@@ -763,6 +971,68 @@
             </div>
             <div id="ad-timer-countdown" class="text-sm font-black text-white">الانتظار: 8ث</div>
             <p class="text-[10px] text-zinc-500">شكراً لدعمك للعبة مزرعة الغياث!</p>
+        </div>
+    </div>
+
+    <!-- REAL-TIME WALLET RECEIPT MODAL -->
+    <div id="receipt-modal" class="hidden fixed inset-0 bg-black/80 z-50 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-card border border-emerald-500/30 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl relative overflow-hidden bg-gradient-to-b from-[#111c11] via-[#0b0c0b] to-[#121212]">
+            <div class="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-yellow-500 to-green-500"></div>
+            
+            <div class="flex justify-between items-center border-b border-white/5 pb-2.5">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-lg">🧾</span>
+                    <h3 class="text-xs font-black text-yellow-400">سند تحويل مالي معتمد</h3>
+                </div>
+                <button onclick="closeReceiptModal()" class="text-zinc-400 hover:text-white transition"><i class="fas fa-times text-xs"></i></button>
+            </div>
+
+            <!-- Receipt Content -->
+            <div class="space-y-3 text-right" dir="rtl">
+                <div class="flex justify-center py-2">
+                    <div class="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center animate-pulse">
+                        <i class="fa fa-circle-check text-2xl text-emerald-400"></i>
+                    </div>
+                </div>
+                <h4 class="text-center text-xs font-black text-white">تم تسوية الدفعة وتحويلها بنجاح!</h4>
+                <p class="text-center text-[10px] text-zinc-400 font-bold leading-normal">
+                    لقد قمنا بمعالجة طلبك وإرسال أرباحك مباشرة إلى العنوان الإلكتروني الموثق.
+                </p>
+
+                <div class="bg-black/50 rounded-2xl p-4 border border-emerald-900/15 space-y-2.5 text-[10px]">
+                    <div class="flex justify-between">
+                        <span class="text-zinc-400 font-bold">بوابة تسوية الأرباح:</span>
+                        <span class="text-emerald-400 font-black" id="rec-provider">شام كاش (سحابي مباشر)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-zinc-400 font-bold">تاريخ المعاملة:</span>
+                        <span class="text-white font-mono" id="rec-date">2026-06-03 11:32</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-zinc-400 font-bold">مُستلم المعاملة:</span>
+                        <span class="text-white font-mono text-left truncate-address" id="rec-address" style="word-break: break-all; max-width: 150px; font-size: 8px;">f376fb5100b957b72e3c46d047f1f2de</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-zinc-400 font-bold">رقم المعاملة:</span>
+                        <span class="text-yellow-500 font-mono text-left truncate-address" id="rec-txid" style="word-break: break-all; max-width: 150px; font-size: 8px;">tx_f376f...</span>
+                    </div>
+                    <div class="border-t border-white/5 my-2"></div>
+                    <div class="flex justify-between text-xs">
+                        <span class="text-zinc-300 font-black">القيمة الصافية المحوّلة:</span>
+                        <span class="text-green-400 font-black" id="rec-amount">+5,000 ل.س</span>
+                    </div>
+                </div>
+
+                <div class="bg-emerald-950/20 rounded-xl p-2 border border-emerald-500/10 text-center">
+                    <span class="text-[8px] text-emerald-400 font-bold flex items-center justify-center gap-1">
+                        <i class="fa fa-shield-halved"></i> تم التأكيد عبر بروتوكول Sham Cash Core v2
+                    </span>
+                </div>
+            </div>
+
+            <button onclick="closeReceiptModal()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs py-2.5 rounded-xl transition">
+                إغلاق المستند
+            </button>
         </div>
     </div>
 

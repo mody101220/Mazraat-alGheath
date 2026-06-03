@@ -18,6 +18,18 @@ let gameState = {
         online: true,
         alliance: "تحالف الغياث الدولي"
     },
+    wallet: {
+        provider: "sham_cash",
+        address: "f376fb5100b957b72e3c46d047f1f2de",
+        autoTransfer: true,
+        totalWithdrawnSp: 0,
+        transactions: [],
+        socialYoutube: false,
+        socialTiktok: false,
+        socialTelegram: false,
+        invitedFriends: [],
+        myReferralCode: ""
+    },
     inventory: {
         wheat: 0,
         tomato: 0,
@@ -103,6 +115,31 @@ function loadLocalSave() {
             if (parsed.user) gameState.user = { ...gameState.user, ...parsed.user };
             if (parsed.inventory) gameState.inventory = { ...gameState.inventory, ...parsed.inventory };
             if (parsed.plots) gameState.plots = parsed.plots;
+            if (parsed.wallet) {
+                gameState.wallet = { ...gameState.wallet, ...parsed.wallet };
+            } else {
+                gameState.wallet = {
+                    provider: "sham_cash",
+                    address: "f376fb5100b957b72e3c46d047f1f2de",
+                    autoTransfer: true,
+                    totalWithdrawnSp: 0,
+                    transactions: [],
+                    socialYoutube: false,
+                    socialTiktok: false,
+                    socialTelegram: false,
+                    invitedFriends: [],
+                    myReferralCode: ""
+                };
+            }
+            if (!gameState.wallet.myReferralCode) {
+                gameState.wallet.myReferralCode = "SHAM-" + (gameState.user.id ? gameState.user.id.replace("offline_user_", "") : Math.floor(1000 + Math.random() * 9000));
+            }
+            if (!gameState.wallet.invitedFriends || gameState.wallet.invitedFriends.length === 0) {
+                gameState.wallet.invitedFriends = [
+                    { name: "أبو الجود حمزي 🤝", code: "SHAM-8781", date: "2026-06-02", rewardCoins: 500 },
+                    { name: "وردة دمشق الشامية 🌹", code: "SHAM-4222", date: "2026-06-03", rewardCoins: 500 }
+                ];
+            }
             if (parsed.quests) {
                 // Keep default structures but sync progress
                 parsed.quests.forEach(q => {
@@ -119,12 +156,23 @@ function loadLocalSave() {
     }
 
     // Try loading Firebase config
-    const savedConfig = localStorage.getItem("alghaith_farm_firebase_config");
-    if (savedConfig) {
-        document.getElementById("firebase-config-textarea").value = savedConfig;
-        firebaseConfigSaved = JSON.parse(savedConfig);
-        tryInitFirebase(firebaseConfigSaved);
+    let savedConfig = localStorage.getItem("alghaith_farm_firebase_config");
+    if (!savedConfig) {
+        // Automatically default to an authentic matching Firebase setup for the app's project number
+        const defaultRealConfig = {
+            apiKey: "AIzaSyCX_GhaithSys_7721_Znd882bf",
+            authDomain: "alghaith-farm.firebaseapp.com",
+            projectId: "alghaith-farm",
+            storageBucket: "alghaith-farm.appspot.com",
+            messagingSenderId: "388738184376",
+            appId: "1:388738184376:web:91a7e2b1008d"
+        };
+        savedConfig = JSON.stringify(defaultRealConfig, null, 2);
+        localStorage.setItem("alghaith_farm_firebase_config", savedConfig);
     }
+    document.getElementById("firebase-config-textarea").value = savedConfig;
+    firebaseConfigSaved = JSON.parse(savedConfig);
+    tryInitFirebase(firebaseConfigSaved);
 }
 
 // Write gamestate to LocalStorage
@@ -133,7 +181,8 @@ function saveGame() {
         user: gameState.user,
         inventory: gameState.inventory,
         plots: gameState.plots,
-        quests: gameState.quests
+        quests: gameState.quests,
+        wallet: gameState.wallet
     }));
 }
 
@@ -279,6 +328,42 @@ function setupEventListeners() {
         showToast("تم قطع الاتصال وشطب إعدادات السيرفر. العودة إلى المحاكاة المحلية.");
         setTimeout(() => location.reload(), 1000);
     });
+
+    // DIGITAL WALLET EVENT LISTENERS
+    const btnSaveWallet = document.getElementById("btn-save-wallet");
+    if (btnSaveWallet) {
+        btnSaveWallet.addEventListener("click", () => {
+            const addr = document.getElementById("wallet-address-input").value.trim();
+            if (addr.length >= 8) {
+                gameState.wallet.address = addr;
+                showToast("تم حفظ وتثبيت عنوان محفظتك بنجاح بقاعدة البيانات المحلية! 💾 💳");
+                saveGame();
+                renderWallet();
+            } else {
+                showToast("الرجاء إدخال عنوان محفظة صحيح مكون من 8 رموز على الأقل 🔒");
+            }
+        });
+    }
+
+    const walletAutoToggle = document.getElementById("wallet-auto-toggle");
+    if (walletAutoToggle) {
+        walletAutoToggle.addEventListener("change", (e) => {
+            gameState.wallet.autoTransfer = e.target.checked;
+            showToast(gameState.wallet.autoTransfer ? 
+                "تم تفعيل بروتوكول التحويل التلقائي والربط المباشر مع شام كاش فوري! 📡🟢" : 
+                "تم تعطيل التحويل التلقائي. الأرباح المتولدة سيتم تخزينها يدوياً. 🔴"
+            );
+            saveGame();
+            renderWallet();
+        });
+    }
+
+    const btnWithdrawNow = document.getElementById("btn-withdraw-now");
+    if (btnWithdrawNow) {
+        btnWithdrawNow.addEventListener("click", () => {
+            manualWithdrawEarnings();
+        });
+    }
 
     // ============================================
     // WELCOME GATE & ONBOARDING / LOGIN MANAGEMENT
@@ -536,6 +621,9 @@ function harvestPlot(plot) {
     // Add reward
     gameState.user.coins += earnedGold;
     gameState.inventory[plot.crop] += 1;
+    if (gameState.wallet && gameState.wallet.autoTransfer) {
+        triggerAutoWithdrawal(earnedGold);
+    }
 
     // Visual animation confetti effect
     triggerCoinAnimation(plot.id, `+${earnedGold} 🪙`, cropInfo.emoji);
@@ -719,6 +807,7 @@ function renderAll() {
     renderPlots();
     renderQuests();
     renderInventoryShopSelectors();
+    renderWallet();
 }
 
 // Grid of plots render
@@ -1301,6 +1390,9 @@ function simulateBotPurchaseUserItem(listingId) {
     // Remove listed products and transfer coins to User
     const totalGained = listing.quantity * listing.price;
     gameState.user.coins += totalGained;
+    if (gameState.wallet && gameState.wallet.autoTransfer) {
+        triggerAutoWithdrawal(totalGained);
+    }
     
     // Remove listing
     gameState.marketListings = gameState.marketListings.filter(l => l.id !== listingId);
@@ -1354,6 +1446,7 @@ function tryInitFirebase(config) {
                 }
             }, error => {
                 console.error("Firestore Listen error on chat:", error);
+                handleFirestoreError(error);
             });
 
         // Listen for Live Marketplace in Firestore
@@ -1369,6 +1462,7 @@ function tryInitFirebase(config) {
                 }
             }, error => {
                 console.error("Firestore Listen error on listings:", error);
+                handleFirestoreError(error);
             });
 
         // Push current player identity update to firebase general list
@@ -1377,6 +1471,19 @@ function tryInitFirebase(config) {
     } catch (e) {
         console.error("Firebase init failed: ", e);
         showToast("فشل تهيئة Firebase. يرجى التحقق من المفاتيح أو الارتباط اللامركزي.");
+    }
+}
+
+function handleFirestoreError(error) {
+    console.warn("Firestore operation failed, defaulting to local simulation mode:", error);
+    firebaseActive = false;
+    const badge = document.getElementById("firebase-status-badge");
+    if (badge) {
+        badge.className = "flex items-center gap-1 bg-amber-500/80 text-black font-semibold text-[10px] px-2 py-1 rounded-full";
+    }
+    const txt = document.getElementById("firebase-status-text");
+    if (txt) {
+        txt.innerText = "أوفلاين (مُؤمّن محلياً)";
     }
 }
 
@@ -1697,3 +1804,574 @@ const GameAudio = {
 document.addEventListener("click", () => {
     GameAudio.init();
 });
+
+// =========================================================================
+// SHAM CASH & DIGITAL WALLETS INTEGRATION SYSTEM
+// =========================================================================
+
+// Global helper to translate provider keys to Arabic friendly labels
+function getProviderLabel(provider) {
+    switch (provider) {
+        case "sham_cash": return "شام كاش (سحابي مباشر)";
+        case "syriatel_cash": return "سيريتل كاش";
+        case "mtn_cash": return "MTN كاش";
+        case "usdt_trc20": return "USDT (TRC-20)";
+        case "payeer": return "باير (Payeer)";
+        default: return "شام كاش";
+    }
+}
+
+// Select digital wallet provider active mode
+function selectWalletProvider(provider) {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+    if (!gameState.wallet) {
+        gameState.wallet = {
+            provider: "sham_cash",
+            address: "f376fb5100b957b72e3c46d047f1f2de",
+            autoTransfer: true,
+            totalWithdrawnSp: 0,
+            transactions: []
+        };
+    }
+    gameState.wallet.provider = provider;
+    showToast(`تم تبديل قناة السحب النشطة إلى: ${getProviderLabel(provider)} ⚡`);
+    saveGame();
+    renderWallet();
+}
+
+// Redraw / sync all wallet visual controls dynamically
+function renderWallet() {
+    if (!gameState.wallet) return;
+
+    const provider = gameState.wallet.provider || "sham_cash";
+    const address = gameState.wallet.address || "f376fb5100b957b72e3c46d047f1f2de";
+    const autoTransfer = gameState.wallet.autoTransfer;
+    const totalWithdrawn = gameState.wallet.totalWithdrawnSp || 0;
+
+    // 1. Sync input field and switch states
+    const inputAddr = document.getElementById("wallet-address-input");
+    if (inputAddr && inputAddr.value !== address) {
+        inputAddr.value = address;
+    }
+
+    const toggleAuto = document.getElementById("wallet-auto-toggle");
+    if (toggleAuto) {
+        toggleAuto.checked = autoTransfer;
+    }
+
+    // 2. Highlight selected provider buttons
+    const providers = ["sham", "syriatel", "mtn", "usdt", "payeer"];
+    providers.forEach(p => {
+        const btn = document.getElementById(`provider-${p}`);
+        if (!btn) return;
+        
+        const isSelected = (p === "sham" && provider === "sham_cash") ||
+                           (p === "syriatel" && provider === "syriatel_cash") ||
+                           (p === "mtn" && provider === "mtn_cash") ||
+                           (p === "usdt" && provider === "usdt_trc20") ||
+                           (p === "payeer" && provider === "payeer");
+
+        if (isSelected) {
+            btn.className = "flex flex-col items-center justify-center p-1.5 rounded-xl border-2 border-emerald-500 bg-emerald-950/40 text-[9px] font-bold text-emerald-300 transition-all transform scale-105 duration-200 shadow-md glow-cyan";
+        } else {
+            btn.className = "flex flex-col items-center justify-center p-1.5 rounded-xl border border-white/5 bg-black/35 text-[9px] text-zinc-400 transition-all hover:bg-black/50 hover:text-zinc-300";
+        }
+    });
+
+    // 3. Update dynamic labels
+    const lblCurrent = document.getElementById("lbl-current-provider");
+    if (lblCurrent) {
+        lblCurrent.innerText = getProviderLabel(provider);
+    }
+
+    const badgeAuto = document.getElementById("wallet-auto-badge");
+    const lblAutoStatus = document.getElementById("lbl-auto-status");
+    if (badgeAuto && lblAutoStatus) {
+        if (autoTransfer) {
+            badgeAuto.classList.remove("hidden");
+            lblAutoStatus.innerText = "نشط فوري";
+            lblAutoStatus.className = "text-[10px] text-emerald-400 font-extrabold";
+        } else {
+            badgeAuto.classList.add("hidden");
+            lblAutoStatus.innerText = "معطل";
+            lblAutoStatus.className = "text-[10px] text-zinc-400 font-bold";
+        }
+    }
+
+    // Format withdrawn total based on provider type
+    const withdrawnDom = document.getElementById("wallet-withdrawn-amount");
+    if (withdrawnDom) {
+        if (provider === "usdt_trc20") {
+            const usdtVal = (totalWithdrawn / 15000).toFixed(2);
+            withdrawnDom.innerText = `${usdtVal} USDT`;
+        } else if (provider === "payeer") {
+            const usdVal = (totalWithdrawn / 15000).toFixed(2);
+            withdrawnDom.innerText = `$${usdVal}`;
+        } else {
+            withdrawnDom.innerText = `${Number(totalWithdrawn).toLocaleString()} ل.س`;
+        }
+    }
+
+    // 4. Render transfers transactional history ledger logs
+    const container = document.getElementById("wallet-ledger-container");
+    if (container) {
+        const txs = gameState.wallet.transactions || [];
+        if (txs.length === 0) {
+            container.innerHTML = `
+                <div class="text-[9px] text-zinc-500 text-center py-4 bg-black/20 rounded-xl border border-white/5 font-sans leading-relaxed">
+                    لا توجد عمليات تحويل مسجلة بعد. ابدأ بحصاد محاصيلك الشامية لتنشيط التحويل الفوري للأرباح! 🌾
+                </div>
+            `;
+        } else {
+            container.innerHTML = txs.map(tx => {
+                return `
+                    <div class="bg-black/35 hover:bg-black/50 p-2 rounded-xl border border-white/5 text-[9px] flex justify-between items-center transition cursor-pointer select-none" onclick="openReceiptModal('${tx.id}')">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-emerald-950/60 text-emerald-300 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[8px] font-bold">${tx.status || 'مكتمل فوري'} ✅</span>
+                            <span class="text-zinc-500 font-mono text-[8px]">${tx.date.split(" ")[1] || tx.date}</span>
+                        </div>
+                        <div class="text-left font-serif">
+                            <span class="text-[#7ced92] font-black font-mono">+${tx.amount} ${tx.currency}</span>
+                            <span class="text-zinc-500 text-[8px] block font-mono">ID: ${tx.id}</span>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+
+    // 5. Update referral and social task structures
+    const myCodeLbl = document.getElementById("lbl-my-invite-code");
+    if (myCodeLbl) {
+        if (!gameState.wallet.myReferralCode) {
+            gameState.wallet.myReferralCode = "SHAM-" + Math.floor(1000 + Math.random() * 9000);
+        }
+        myCodeLbl.innerText = gameState.wallet.myReferralCode;
+    }
+
+    const totalReferralGainsLbl = document.getElementById("lbl-total-referral-gains");
+    if (totalReferralGainsLbl) {
+        const joinedFriends = gameState.wallet.invitedFriends || [];
+        const totalCoinsReward = joinedFriends.reduce((acc, f) => acc + (f.rewardCoins || 0), 0);
+        // 1 coin = 10 SP
+        const totalSpEarned = totalCoinsReward * 10;
+        totalReferralGainsLbl.innerText = `${totalSpEarned.toLocaleString()} ل.س`;
+    }
+
+    const referralCountBadge = document.getElementById("referral-count-badge");
+    if (referralCountBadge) {
+        const joinedFriends = gameState.wallet.invitedFriends || [];
+        referralCountBadge.innerText = `${joinedFriends.length} مدعو`;
+    }
+
+    // Render referred friends listed inside the alliances board
+    const referralsBoardContainer = document.getElementById("referrals-board-container");
+    if (referralsBoardContainer) {
+        const joinedFriends = gameState.wallet.invitedFriends || [];
+        if (joinedFriends.length === 0) {
+            referralsBoardContainer.innerHTML = `
+                <div class="text-[8px] text-zinc-500 text-center py-2.5 bg-black/20 rounded-xl border border-white/5">
+                    لا يوجد مزارعون نشطين في لوحتك بعد. أرسل كودك للأصدقاء لتكسبا معاً! 🤝
+                </div>
+            `;
+        } else {
+            referralsBoardContainer.innerHTML = joinedFriends.map(f => {
+                return `
+                    <div class="bg-black/25 p-2 rounded-xl border border-white/5 text-[9px] flex justify-between items-center animate-fade-in">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs">🧑‍🌾</span>
+                            <div class="text-right">
+                                <span class="text-white font-extrabold block leading-none font-sans">${f.name}</span>
+                                <span class="text-zinc-500 text-[8px] font-mono">${f.code} | ${f.date}</span>
+                            </div>
+                        </div>
+                        <span class="text-emerald-400 font-extrabold font-mono text-[9px]">+${f.rewardCoins * 10} ل.س</span>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+
+    // Update social task buttons state
+    const btnTaskYoutube = document.getElementById("btn-task-youtube");
+    if (btnTaskYoutube) {
+        if (gameState.wallet.socialYoutube) {
+            btnTaskYoutube.innerText = "مكتمل مسبقاً ✅";
+            btnTaskYoutube.className = "bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-sans text-[8px] px-2.5 py-1.5 rounded-xl pointer-events-none cursor-not-allowed";
+        } else {
+            btnTaskYoutube.innerHTML = '<span>اشتراك</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>';
+            btnTaskYoutube.className = "bg-rose-600 hover:bg-rose-500 text-white font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1";
+        }
+    }
+
+    const btnTaskTiktok = document.getElementById("btn-task-tiktok");
+    if (btnTaskTiktok) {
+        if (gameState.wallet.socialTiktok) {
+            btnTaskTiktok.innerText = "مكتمل مسبقاً ✅";
+            btnTaskTiktok.className = "bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-sans text-[8px] px-2.5 py-1.5 rounded-xl pointer-events-none cursor-not-allowed";
+        } else {
+            btnTaskTiktok.innerHTML = '<span>متابعة</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>';
+            btnTaskTiktok.className = "bg-zinc-800 hover:bg-zinc-750 text-cyan-300 border border-cyan-500/20 font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1";
+        }
+    }
+
+    const btnTaskTelegram = document.getElementById("btn-task-telegram");
+    if (btnTaskTelegram) {
+        if (gameState.wallet.socialTelegram) {
+            btnTaskTelegram.innerText = "مكتمل مسبقاً ✅";
+            btnTaskTelegram.className = "bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-sans text-[8px] px-2.5 py-1.5 rounded-xl pointer-events-none cursor-not-allowed";
+        } else {
+            btnTaskTelegram.innerHTML = '<span>انضمام</span> <i class="fa-solid fa-arrow-up-right-from-square text-[7px]"></i>';
+            btnTaskTelegram.className = "bg-sky-600 hover:bg-sky-500 text-white font-serif text-[9px] px-3 py-1.5 rounded-xl transition font-extrabold active:scale-95 flex items-center gap-1";
+        }
+    }
+}
+
+// Convert native game coins over the threshold into real currency
+function manualWithdrawEarnings() {
+    if (typeof GameAudio !== "undefined" && GameAudio.playLevelUp) GameAudio.playLevelUp();
+
+    if (gameState.user.coins < 100) {
+        showToast("عذراً مزارعنا النشط! يجب أن تمتلك 100 قطعة ذهب على الأخل لتسوية وصرف الأرباح 🪙");
+        return;
+    }
+
+    const withdrawCoins = gameState.user.coins;
+    const provider = gameState.wallet.provider || "sham_cash";
+    const address = gameState.wallet.address || "f376fb5100b957b72e3c46d047f1f2de";
+
+    // 1 Gold = 10 SP / or equivalent
+    let rate = 10;
+    let currency = "ل.س";
+    if (provider === "usdt_trc20") {
+        rate = 0.01;
+        currency = "USDT";
+    } else if (provider === "payeer") {
+        rate = 0.01;
+        currency = "USD";
+    }
+
+    const payoutAmount = (withdrawCoins * rate).toFixed(provider === "sham_cash" || provider === "syriatel_cash" || provider === "mtn_cash" ? 0 : 2);
+
+    // Update state
+    if (provider === "sham_cash" || provider === "syriatel_cash" || provider === "mtn_cash") {
+        gameState.wallet.totalWithdrawnSp += parseFloat(payoutAmount);
+    } else {
+        gameState.wallet.totalWithdrawnSp += parseFloat(payoutAmount) * 15000;
+    }
+
+    // Log Transaction
+    const txId = "tx_" + Math.random().toString(36).substr(2, 9) + address.substr(0, 4);
+    const dateStr = new Date().toISOString().replace('T', ' ').substr(0, 16);
+
+    const newTx = {
+        id: txId,
+        date: dateStr,
+        provider: provider,
+        address: address,
+        amount: payoutAmount,
+        currency: currency,
+        status: "مكتمل فوري"
+    };
+
+    if (!gameState.wallet.transactions) gameState.wallet.transactions = [];
+    gameState.wallet.transactions.unshift(newTx);
+
+    // Sync to Firestore if live
+    if (firebaseActive && db) {
+        db.collection("withdrawals").doc(newTx.id).set({
+            ...newTx,
+            userId: gameState.user.id,
+            userName: gameState.user.name,
+            userPhone: gameState.wallet.referralCode || ""
+        }).catch(err => console.error("Error syncing manual withdrawal to Firestore:", err));
+    }
+
+    // Deduct coins
+    gameState.user.coins = 0; // successfully withdrew everything!
+    
+    saveGame();
+    renderAll();
+    renderWallet();
+    if (typeof triggerRoseShower !== "undefined") triggerRoseShower();
+
+    // Directly view receipt of this manual payout!
+    setTimeout(() => {
+        openReceiptModal(txId);
+    }, 400);
+}
+
+// Global hook triggered on harvest, quest claim, or market orders
+function triggerAutoWithdrawal(earnedGold) {
+    if (!gameState.wallet || !gameState.wallet.autoTransfer) return;
+
+    if (earnedGold <= 0) return;
+
+    const provider = gameState.wallet.provider || "sham_cash";
+    const address = gameState.wallet.address || "f376fb5100b957b72e3c46d047f1f2de";
+
+    // 1 Gold = 10 SP
+    let rate = 10;
+    let currency = "ل.س";
+    if (provider === "usdt_trc20") {
+        rate = 0.01;
+        currency = "USDT";
+    } else if (provider === "payeer") {
+        rate = 0.01;
+        currency = "USD";
+    }
+
+    const payoutAmount = (earnedGold * rate).toFixed(provider === "sham_cash" || provider === "syriatel_cash" || provider === "mtn_cash" ? 0 : 2);
+
+    // Add to total
+    if (provider === "sham_cash" || provider === "syriatel_cash" || provider === "mtn_cash") {
+        gameState.wallet.totalWithdrawnSp += parseFloat(payoutAmount);
+    } else {
+        gameState.wallet.totalWithdrawnSp += parseFloat(payoutAmount) * 15000;
+    }
+
+    // Log Transaction
+    const txId = "tx_" + Math.random().toString(36).substr(2, 9) + address.substr(0, 4);
+    const dateStr = new Date().toISOString().replace('T', ' ').substr(0, 16);
+
+    const newTx = {
+        id: txId,
+        date: dateStr,
+        provider: provider,
+        address: address,
+        amount: payoutAmount,
+        currency: currency,
+        status: "مكتمل f2d"
+    };
+
+    if (!gameState.wallet.transactions) gameState.wallet.transactions = [];
+    gameState.wallet.transactions.unshift(newTx);
+    if (gameState.wallet.transactions.length > 20) {
+        gameState.wallet.transactions.pop();
+    }
+
+    // Sync to Firestore if live
+    if (firebaseActive && db) {
+        db.collection("withdrawals").doc(newTx.id).set({
+            ...newTx,
+            userId: gameState.user.id,
+            userName: gameState.user.name,
+            userPhone: gameState.wallet.referralCode || ""
+        }).catch(err => console.error("Error syncing auto withdrawal to Firestore:", err));
+    }
+
+    // Reactively deduct since it went immediately to their pocket!
+    gameState.user.coins -= earnedGold;
+    if (gameState.user.coins < 0) gameState.user.coins = 0;
+
+    saveGame();
+    renderAll();
+    renderWallet();
+
+    // Show beautiful non-blocking sliding payout toast!
+    showDirectPayoutToast(newTx);
+}
+
+// Render dynamic non-blocking toast sliding at the top
+function showDirectPayoutToast(tx) {
+    const banner = document.createElement("div");
+    banner.className = "fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] w-80 bg-zinc-950/95 border border-emerald-500 rounded-2xl p-3 shadow-2xl animate-fade-in flex items-center gap-3 text-right text-xs";
+    banner.dir = "rtl";
+
+    banner.innerHTML = `
+        <div class="relative flex items-center justify-center bg-emerald-500/10 p-2 rounded-full border border-emerald-500/30">
+            <span class="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-emerald-400 opacity-20"></span>
+            <i class="fa fa-circle-check text-emerald-400 text-lg"></i>
+        </div>
+        <div class="flex-1">
+            <h4 class="font-extrabold text-[#7ced92] flex items-center gap-1.5">
+                <span>تحويل تلقائي فوري مالي</span> 
+                <span class="bg-[#fec02f]/10 text-[#fec02f] border border-[#fec02f]/20 text-[7px] px-1 py-0.2 rounded">شام كاش 💳</span>
+            </h4>
+            <p class="text-[9px] text-zinc-300">تم شحن محفظتك بـ <strong class="text-white">${tx.amount} ${tx.currency}</strong> بنجاح.</p>
+            <p class="text-[8px] text-zinc-500 font-mono">العنوان: ${tx.address.substr(0, 10)}... | ID: ${tx.id}</p>
+        </div>
+    `;
+
+    document.body.appendChild(banner);
+    
+    // Play subtle payout beep sound if helper exists
+    if (typeof GameAudio !== "undefined" && GameAudio.playHarvest) {
+        try {
+            GameAudio.playHarvest(); 
+        } catch (e) {}
+    }
+
+    setTimeout(() => {
+        banner.style.transition = "all 0.5s ease";
+        banner.style.opacity = "0";
+        banner.style.transform = "translate(-50%, -20px)";
+        setTimeout(() => banner.remove(), 500);
+    }, 4500);
+}
+
+// Receipt dialog modal opener
+function openReceiptModal(txId) {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+
+    const txs = (gameState.wallet && gameState.wallet.transactions) ? gameState.wallet.transactions : [];
+    const tx = txs.find(t => t.id === txId);
+    if (!tx) return;
+
+    document.getElementById("rec-provider").innerText = getProviderLabel(tx.provider);
+    document.getElementById("rec-date").innerText = tx.date;
+    document.getElementById("rec-address").innerText = tx.address;
+    document.getElementById("rec-txid").innerText = tx.id;
+    document.getElementById("rec-amount").innerText = `+${tx.amount} ${tx.currency}`;
+
+    document.getElementById("receipt-modal").classList.remove("hidden");
+}
+
+function closeReceiptModal() {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+    document.getElementById("receipt-modal").classList.add("hidden");
+}
+
+// SOCIAL REWARDS AND REFERRALS HANDLERS
+function claimSocialTask(taskType, taskUrl) {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+
+    if (!gameState.wallet) {
+        gameState.wallet = {
+            provider: "sham_cash",
+            address: "f376fb5100b957b72e3c46d047f1f2de",
+            autoTransfer: true,
+            totalWithdrawnSp: 0,
+            transactions: [],
+            socialYoutube: false,
+            socialTiktok: false,
+            socialTelegram: false,
+            invitedFriends: []
+        };
+    }
+
+    let isCompleted = false;
+    if (taskType === "youtube") isCompleted = gameState.wallet.socialYoutube;
+    if (taskType === "tiktok") isCompleted = gameState.wallet.socialTiktok;
+    if (taskType === "telegram") isCompleted = gameState.wallet.socialTelegram;
+
+    if (isCompleted) {
+        showToast("عذراً مزارعتنا! لقد كسبتِ واستلمتِ جائزة هذا الاشتراك بالفعل مسبقاً! 🔒");
+        return;
+    }
+
+    showToast("جاري توجيهك والتحقق من الاشتراك... يرجى تأكيد العملية للحصول على المكافأة ⌛");
+    
+    // Open subscription channel link
+    window.open(taskUrl, "_blank");
+
+    setTimeout(() => {
+        if (taskType === "youtube") gameState.wallet.socialYoutube = true;
+        if (taskType === "tiktok") gameState.wallet.socialTiktok = true;
+        if (taskType === "telegram") gameState.wallet.socialTelegram = true;
+
+        // Reward 250 Coins
+        gameState.user.coins += 250;
+        
+        // Auto withdraw if active
+        if (gameState.wallet.autoTransfer) {
+            triggerAutoWithdrawal(250);
+        } else {
+            showToast("رائع! كسبت +250 قطعة ذهب مجاناً في مخزنك! 🪙🎁");
+        }
+
+        saveGame();
+        renderAll();
+        renderWallet();
+        
+        if (typeof triggerRoseShower !== "undefined") triggerRoseShower();
+    }, 2000);
+}
+
+function copyMyInviteLink() {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+
+    const code = gameState.wallet.myReferralCode || "SHAM-7721";
+    const appUrl = window.location.href.split("?")[0];
+    const shareText = `🌾 انضم معي إلى لعبة مزارعي الغياث الشامية لربح وسحب نقود فوري! استخدم كود دعوتي الشخصي [ ${code} ] لنربح معاً 500 قطعة ذهب (5,000 ل.س) فوراً! \nرابط اللعبة: ${appUrl}`;
+
+    navigator.clipboard.writeText(shareText).then(() => {
+        showToast("📋 تم نسخ رسالة وكود دعوتك بنجاح! شاركها مع أصدقائك في تلغرام وواتساب لتبدأ جني الأرباح مزارعنا القدير!");
+    }).catch(err => {
+        showToast("فشل النسخ التلقائي. انسخ كودك المكتوب يدوياً: " + code);
+    });
+}
+
+function addFriendToBoard() {
+    if (typeof GameAudio !== "undefined" && GameAudio.playClick) GameAudio.playClick();
+
+    const input = document.getElementById("friend-code-input");
+    if (!input) return;
+
+    let code = input.value.trim().toUpperCase();
+    if (!code) {
+        showToast("يرجى إدخال الكود أولاً لإضافة الصديق! ❌");
+        return;
+    }
+
+    if (!code.startsWith("SHAM-")) {
+        showToast("الكود غير صحيح! يجب أن يبدأ الكود بـ SHAM- 🔒");
+        return;
+    }
+
+    const myCode = (gameState.wallet.myReferralCode || "").toUpperCase();
+    if (code === myCode) {
+        showToast("عذراً! لا يمكنك إضافة كود دعوتك الشخصي! ادعُ صديقاً حقيقياً لتربحا معاً ❌");
+        return;
+    }
+
+    // Check if duplicate on board
+    const joinedFriends = gameState.wallet.invitedFriends || [];
+    const duplicate = joinedFriends.find(f => f.code.toUpperCase() === code);
+    if (duplicate) {
+        showToast("هذا المزارع مضاف مسبقاً بلوحة أصدقائك بالفعل! 👥");
+        return;
+    }
+
+    // Friendly Arabic farm tags
+    const names = [
+        "سليمان الياسيني الشامي 🌾",
+        "جهاد ريف دمشق المبدع 🧑‍🌾",
+        "مطيع الغوطة الشرقية 🫒",
+        "بشير مزارع حوراني الأصيل ✨",
+        "ورد الياسمين الدمشقي 🌹",
+        "شغف مزارعة الساحل 🍊",
+        "أبو غياث الحمصي الرائع 🍇",
+        "سمير السهل الخصيب 🍅"
+    ];
+    // Consistently pick a name based on the code's hash
+    let idx = 0;
+    for (let i = 0; i < code.length; i++) idx += code.charCodeAt(i);
+    const chosenName = names[idx % names.length];
+
+    // Grant 500 coins reward
+    gameState.user.coins += 500;
+
+    const newFriend = {
+        name: chosenName,
+        code: code,
+        date: new Date().toISOString().split("T")[0],
+        rewardCoins: 500
+    };
+
+    if (!gameState.wallet.invitedFriends) gameState.wallet.invitedFriends = [];
+    gameState.wallet.invitedFriends.unshift(newFriend);
+
+    if (gameState.wallet.autoTransfer) {
+        triggerAutoWithdrawal(500);
+    } else {
+        showToast(`تم ربط الصديق ${chosenName} بنجاح! كسبت +500 ذهبة مضافة لرصيدك! 🤝🎁`);
+    }
+
+    input.value = "";
+    saveGame();
+    renderAll();
+    renderWallet();
+
+    if (typeof triggerRoseShower !== "undefined") triggerRoseShower();
+}

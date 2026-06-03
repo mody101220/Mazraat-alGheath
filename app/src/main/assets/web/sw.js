@@ -3,8 +3,12 @@ const ASSETS = [
   "index.html",
   "app.js",
   "manifest.json",
+  "img_farm_bg.png",
   "https://cdn.tailwindcss.com",
-  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
+  "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js",
+  "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"
 ];
 
 self.addEventListener("install", (e) => {
