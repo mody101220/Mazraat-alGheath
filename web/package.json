@@ -1,0 +1,23 @@
+{
+  "name": "mazraat-al-ghaith-farm",
+  "version": "2.0.0",
+  "description": "Al-Ghaith Farm - Digital Farm Management Progressive Web App",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server -p 3000",
+    "build": "echo 'No build step required for static site'",
+    "test": "echo 'No tests configured yet'"
+  },
+  "keywords": [
+    "farm",
+    "pwa",
+    "game",
+    "agriculture",
+    "vercel"
+  ],
+  "author": "Mazraat Al-Ghaith",
+  "license": "ISC",
+  "dependencies": {
+    "@vercel/analytics": "^1.1.1"
+  }
+}
