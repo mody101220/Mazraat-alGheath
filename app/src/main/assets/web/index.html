@@ -112,6 +112,91 @@
             border-color: #10b981 !important;
             box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         }
+        
+        /* Immersive Weather System Styles */
+        .weather-animation-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            overflow: hidden;
+            display: block;
+        }
+        .rain-drop {
+            position: absolute;
+            background: linear-gradient(180deg, transparent, rgba(135, 206, 250, 0.8));
+            width: 1.5px;
+            height: 22px;
+            pointer-events: none;
+            opacity: 0.8;
+            animation: fallAnimation 0.9s linear infinite;
+        }
+        @keyframes fallAnimation {
+            0% { transform: translateY(-50px) rotate(15deg); }
+            100% { transform: translateY(400px) rotate(15deg); }
+        }
+        .rain-ripple {
+            position: absolute;
+            border: 1px solid rgba(173, 216, 230, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: scale(0);
+            animation: rippleAnimation 0.6s ease-out infinite;
+        }
+        @keyframes rippleAnimation {
+            0% { transform: scale(0); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        .sun-ray-effect {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 10% 10%, rgba(255, 223, 0, 0.18) 0%, rgba(255, 200, 50, 0.05) 55%, transparent 100%);
+            mix-blend-mode: screen;
+            pointer-events: none;
+            z-index: 4;
+            animation: sunBeamPulse 5s ease-in-out infinite alternate;
+        }
+        @keyframes sunBeamPulse {
+            0% { opacity: 0.65; }
+            100% { opacity: 1.0; }
+        }
+        .star-item {
+            position: absolute;
+            background-color: #ffffff;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: starTwinkleAnimation 3s ease-in-out infinite alternate;
+        }
+        @keyframes starTwinkleAnimation {
+            0% { opacity: 0.1; transform: scale(0.8); }
+            100% { opacity: 1.0; transform: scale(1.2); }
+        }
+        .fog-mist-layer {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(230, 245, 255, 0.04) 0%, rgba(230, 245, 255, 0.09) 50%, rgba(230, 245, 255, 0.04) 100%);
+            filter: blur(8px);
+            pointer-events: none;
+            z-index: 4;
+            animation: fogSwayAnimation 16s ease-in-out infinite alternate;
+        }
+        @keyframes fogSwayAnimation {
+            0% { transform: translateX(-15%); }
+            100% { transform: translateX(15%); }
+        }
+        .sparkle-ember {
+            position: absolute;
+            background: rgba(255, 223, 0, 0.45);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: emberFloat 7s linear infinite;
+        }
+        @keyframes emberFloat {
+            0% { transform: translateY(350px) translateX(0px) scale(0.5); opacity: 0; }
+            20% { opacity: 0.8; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-50px) translateX(45px) scale(1); opacity: 0; }
+        }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col md:flex-row no-scrollbar">
@@ -332,11 +417,21 @@
                 </div>
 
                 <!-- Agricultural Farmland Area -->
-                <div class="flex-1 glass-card p-4 rounded-3xl shadow-2xl flex flex-col justify-center">
-                    <div class="flex justify-between items-center mb-3 px-1">
-                        <span class="text-xs font-black text-emerald-300 flex items-center gap-1.5"><i class="fa fa-tractor"></i> حقل الزراعة الغياثي الممتد</span>
-                        <div class="text-[10px] text-green-200 bg-black/40 border border-emerald-500/20 px-2.5 py-1 rounded-full font-bold" id="farm-soil-moisture">
-                            رطوبة التربة: ممتاز 💧
+                <div class="flex-1 glass-card p-4 rounded-3xl shadow-2xl flex flex-col justify-center relative overflow-hidden">
+                    <!-- Dynamic Weather Overlayer -->
+                    <div id="weather-animation-overlay" class="weather-animation-overlay rounded-3xl"></div>
+                    
+                    <div class="flex justify-between items-center mb-3 px-1 gap-2 flex-wrap z-10">
+                        <span class="text-xs font-black text-emerald-300 flex items-center gap-1.5"><i class="fa fa-tractor"></i> حقل المزرعة</span>
+                        <div class="flex items-center gap-1.5 ml-auto">
+                            <!-- Clickable Weather Controller & Preview Pill -->
+                            <div id="farm-weather-hud" class="text-[10px] text-yellow-400 bg-black/50 border border-yellow-500/20 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 cursor-pointer hover:bg-black/80 transition active:scale-95 shadow" title="اضغط لتبديل الطقس يدوياً" onclick="cycleWeatherState()">
+                                <span id="weather-hud-icon"><i class="fas fa-sun text-yellow-400"></i></span>
+                                <span id="weather-hud-text">شمس دافئة</span>
+                            </div>
+                            <div class="text-[10px] text-green-200 bg-black/50 border border-emerald-500/20 px-2.5 py-1 rounded-full font-bold shadow" id="farm-soil-moisture">
+                                رطوبة التربة: ممتازة 💧
+                            </div>
                         </div>
                     </div>
 

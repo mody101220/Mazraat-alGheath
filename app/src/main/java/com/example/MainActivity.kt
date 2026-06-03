@@ -55,30 +55,10 @@ class MainActivity : ComponentActivity() {
                     var registeredUser by remember { mutableStateOf<Triple<String, String, String>?>(null) }
 
                     if (isAuthenticated) {
-                        MainAppContent(
-                            onWebViewCreated = { webViewInstance ->
-                                webView = webViewInstance
-                                registeredUser?.let { (name, alliance, avatar) ->
-                                    val escapedName = name.replace("'", "\\'")
-                                    val escapedAlliance = alliance.replace("'", "\\'")
-                                    val escapedAvatar = avatar.replace("'", "\\'")
-                                    val js = """
-                                        (function() {
-                                            localStorage.setItem('alghaith_farm_onboarded_v2', 'true');
-                                            var stateStr = localStorage.getItem('alghaith_farm_gamestate_v1');
-                                            var state = {};
-                                            if (stateStr) {
-                                                try { state = JSON.parse(stateStr); } catch(e) {}
-                                            }
-                                            if (!state.user) state.user = {};
-                                            state.user.name = '$escapedName';
-                                            state.user.alliance = '$escapedAlliance';
-                                            state.user.avatar = '$escapedAvatar';
-                                            localStorage.setItem('alghaith_farm_gamestate_v1', JSON.stringify(state));
-                                        })();
-                                    """.trimIndent()
-                                    webViewInstance.evaluateJavascript(js, null)
-                                }
+                        com.example.ui.GameDashboardScreen(
+                            viewModel = viewModel,
+                            onLogout = {
+                                viewModel.logout()
                             }
                         )
                     } else {

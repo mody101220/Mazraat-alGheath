@@ -82,6 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     loadLocalSave();
     setupEventListeners();
     initGameLoops();
+    initWeatherSystem();
     renderAll();
 });
 
@@ -149,6 +150,7 @@ function setupEventListeners() {
     let isNight = false;
     btnThemeToggle.addEventListener("click", () => {
         isNight = !isNight;
+        window.isFarmNight = isNight;
         const bodyTag = document.body;
         const themeIcon = document.getElementById("theme-icon");
         if (isNight) {
@@ -159,6 +161,9 @@ function setupEventListeners() {
             bodyTag.style.backgroundColor = "#121212";
             themeIcon.className = "fas fa-sun text-yellow-400";
             showToast("شروق الشمس الساطعة على حقول الغياث ☀️");
+        }
+        if (typeof applyWeatherEffects === "function") {
+            applyWeatherEffects();
         }
     });
 
@@ -397,6 +402,7 @@ function initGameLoops() {
 
 // Switch navigation tabs
 function switchTab(tabId) {
+    if (typeof GameAudio !== "undefined") GameAudio.playClick();
     gameState.currentTab = tabId;
     
     // Toggle active styles on footer items
@@ -429,6 +435,7 @@ function switchTab(tabId) {
 
 // Seed selections
 function selectSeed(seedId) {
+    if (typeof GameAudio !== "undefined") GameAudio.playClick();
     gameState.selectedSeed = seedId;
     const seeds = ["wheat", "tomato", "rose", "olive"];
     seeds.forEach(s => {
@@ -447,6 +454,7 @@ function clickSoilPlot(plotId) {
     if (!plot) return;
 
     if (plot.locked) {
+        if (typeof GameAudio !== "undefined") GameAudio.playClick();
         showToast("هذه التربة مقفلة! يجب توسيع الحقل أولاً.");
         return;
     }
@@ -469,11 +477,21 @@ function clickSoilPlot(plotId) {
             growSec = Math.ceil(growSec / 2);
         }
 
+        // Climate Advantage: Rainy weather speeds up crop growth by 25% (takes 75% time)
+        if (window.currentWeather === "rainy" || window.currentWeather === "thunderstorm") {
+            growSec = Math.ceil(growSec * 0.75);
+        }
+
         plot.crop = gameState.selectedSeed;
         plot.plantedAt = now;
         plot.readyAt = now + (growSec * 1000);
 
-        showToast(`تم زرع ${seedInfo.name} بنجاح في الحقل.`);
+        if (typeof GameAudio !== "undefined") GameAudio.playSuccess();
+        if (window.currentWeather === "rainy" || window.currentWeather === "thunderstorm") {
+            showToast(`🌧️ تم زرع ${seedInfo.name} تحت مياه المطر التفاعلي (نمو أسرع 25%!)`);
+        } else {
+            showToast(`تم زرع ${seedInfo.name} بنجاح في الحقل.`);
+        }
         trackQuestProgress("plant_wheat", gameState.selectedSeed === "wheat" ? 1 : 0);
         saveGame();
         renderAll();
@@ -485,7 +503,12 @@ function clickSoilPlot(plotId) {
     // 3. User taps crop early -> display remaining time info
     else {
         const leftSec = Math.ceil((plot.readyAt - now) / 1000);
-        showToast(`هذا النبات ينمو بشكل رائع. متبقي ${leftSec} ثانية لحصاده ⏳`);
+        if (typeof GameAudio !== "undefined") GameAudio.playClick();
+        if (window.currentWeather === "rainy" || window.currentWeather === "thunderstorm") {
+            showToast(`🌧️ قطرات المطر تغذي النبات حالياً! متبقي ${leftSec} ثانية ⏳`);
+        } else {
+            showToast(`هذا النبات ينمو بشكل رائع. متبقي ${leftSec} ثانية لحصاده ⏳`);
+        }
     }
 }
 
@@ -494,6 +517,7 @@ function harvestPlot(plot) {
     const cropInfo = cropsDb[plot.crop];
     if (!cropInfo) return;
 
+    if (typeof GameAudio !== "undefined") GameAudio.playHarvest();
     let earnedGold = cropInfo.rewardCoins;
     let earnedXp = cropInfo.rewardXp;
 
@@ -876,6 +900,7 @@ function publishListing() {
         // Publish to real Firebase DB
         db.collection("market").doc(newListing.id).set(newListing)
             .then(() => {
+                if (typeof GameAudio !== "undefined") GameAudio.playSuccess();
                 showToast("تم نشر محصولك بنجاح في سوق الغياث الحقيقي!");
                 trackQuestProgress("market_trade", 1);
                 closeSellModal();
@@ -886,6 +911,7 @@ function publishListing() {
     } else {
         // Fallback simulation mode
         gameState.marketListings.unshift(newListing);
+        if (typeof GameAudio !== "undefined") GameAudio.playSuccess();
         showToast("تم نشر محصولك بنجاح في سوق المزرعة التفاعلي!");
         trackQuestProgress("market_trade", 1);
         closeSellModal();
@@ -1007,6 +1033,7 @@ function buyMarketItem(listingId) {
         }).then(() => {
             gameState.user.coins -= totalCost;
             gameState.inventory[listing.itemType] += listing.quantity;
+            if (typeof GameAudio !== "undefined") GameAudio.playSuccess();
             showToast(`اكتمل الشراء! تم خصم ${totalCost} ذهب وإضافة المحاصيل للمخزن 🛒`);
             saveGame();
             renderAll();
@@ -1020,6 +1047,7 @@ function buyMarketItem(listingId) {
         
         // Remove item from listings database
         gameState.marketListings = gameState.marketListings.filter(l => l.id !== listingId);
+        if (typeof GameAudio !== "undefined") GameAudio.playSuccess();
         showToast(`اكتمل الشراء التفاعلي! تم امتلاك ${listing.quantity} حبات من ${cropsDb[listing.itemType].name}.`);
         saveGame();
         renderAll();
@@ -1359,3 +1387,306 @@ function syncUserToFirebase() {
         lastLogin: Date.now()
     }).catch(err => console.error("Error syncing user metadata: ", err));
 }
+
+// ==========================================
+// DYNAMIC WEATHER SYSTEM ENGINE (نظام الطقس)
+// ==========================================
+window.currentWeather = "sunny";
+
+function initWeatherSystem() {
+    // 1. Determine local system clock hour of the day
+    const hour = new Date().getHours();
+    
+    // 2. Map system timezone with climatic ambiance
+    if (hour >= 5 && hour < 8) {
+        window.currentWeather = "cloudy_mist"; // Misty sunrise early morning
+    } else if (hour >= 8 && hour < 17) {
+        window.currentWeather = "sunny"; // Warm cozy sunny day
+    } else if (hour >= 17 && hour < 20) {
+        window.currentWeather = "sunny"; // Sunset orange glow
+    } else {
+        // Evening / Mid-night defaults
+        window.currentWeather = Math.random() > 0.45 ? "sunny" : "rainy"; // Twinkling stars night or rainfall
+    }
+    
+    // Set matching background night switch matching standard system hour
+    const bodyTag = document.body;
+    const themeIcon = document.getElementById("theme-icon");
+    if (hour < 6 || hour >= 19) {
+        window.isFarmNight = true;
+        if (bodyTag) bodyTag.style.backgroundColor = "#070c07";
+        if (themeIcon) themeIcon.className = "fas fa-moon text-blue-300";
+    } else {
+        window.isFarmNight = false;
+        if (bodyTag) bodyTag.style.backgroundColor = "#121212";
+        if (themeIcon) themeIcon.className = "fas fa-sun text-yellow-400";
+    }
+    
+    // 3. Render animations
+    applyWeatherEffects();
+}
+
+function applyWeatherEffects() {
+    const overlay = document.getElementById("weather-animation-overlay");
+    if (!overlay) return;
+    
+    // Reset overlay elements
+    overlay.innerHTML = "";
+    
+    const weather = window.currentWeather;
+    const isNight = window.isFarmNight === true;
+    
+    const hudIcon = document.getElementById("weather-hud-icon");
+    const hudText = document.getElementById("weather-hud-text");
+    const moistureEl = document.getElementById("farm-soil-moisture");
+    
+    if (weather === "sunny") {
+        if (isNight) {
+            // Starry Moonlit Night
+            for (let i = 0; i < 20; i++) {
+                const star = document.createElement("div");
+                star.className = "star-item";
+                star.style.left = Math.random() * 95 + "%";
+                star.style.top = Math.random() * 85 + "%";
+                star.style.width = (Math.random() * 2.5 + 1.2) + "px";
+                star.style.height = star.style.width;
+                star.style.animationDelay = (Math.random() * 3) + "s";
+                star.style.animationDuration = (Math.random() * 2 + 2) + "s";
+                overlay.appendChild(star);
+            }
+            if (hudIcon) hudIcon.innerHTML = '<i class="fas fa-moon text-blue-300 animate-pulse"></i>';
+            if (hudText) hudText.innerText = "سماء النجوم";
+            if (moistureEl) {
+                moistureEl.innerHTML = "رطوبة ليلية: 80% 💧🌙";
+                moistureEl.className = "text-[10px] text-indigo-300 bg-black/50 border border-indigo-500/20 px-2.5 py-1 rounded-full font-bold shadow";
+            }
+        } else {
+            // Sunny Warm Day (Light pollen solar flares)
+            const ray = document.createElement("div");
+            ray.className = "sun-ray-effect";
+            overlay.appendChild(ray);
+            
+            for (let i = 0; i < 15; i++) {
+                const spark = document.createElement("div");
+                spark.className = "sparkle-ember";
+                spark.style.left = Math.random() * 100 + "%";
+                spark.style.width = (Math.random() * 4 + 2) + "px";
+                spark.style.height = spark.style.width;
+                spark.style.animationDelay = (Math.random() * 7) + "s";
+                spark.style.animationDuration = (Math.random() * 5 + 6) + "s";
+                overlay.appendChild(spark);
+            }
+            
+            if (hudIcon) hudIcon.innerHTML = '<i class="fas fa-sun text-yellow-400 animate-spin" style="animation-duration: 20s"></i>';
+            if (hudText) hudText.innerText = "شمس دافئة";
+            if (moistureEl) {
+                moistureEl.innerHTML = "تربة دافئة: 75% ☀️";
+                moistureEl.className = "text-[10px] text-yellow-300 bg-black/50 border border-yellow-500/20 px-2.5 py-1 rounded-full font-bold shadow";
+            }
+        }
+    } 
+    else if (weather === "rainy") {
+        // Falling raindrops
+        const rainCount = isNight ? 45 : 35;
+        for (let i = 0; i < rainCount; i++) {
+            const drop = document.createElement("div");
+            drop.className = "rain-drop";
+            drop.style.left = Math.random() * 100 + "%";
+            drop.style.top = (Math.random() * -15) + "%";
+            drop.style.animationDelay = (Math.random() * 0.9) + "s";
+            drop.style.animationDuration = (Math.random() * 0.4 + 0.7) + "s";
+            overlay.appendChild(drop);
+        }
+        
+        // Splashing rain ripples
+        for (let i = 0; i < 6; i++) {
+            const ripple = document.createElement("div");
+            ripple.className = "rain-ripple";
+            ripple.style.left = Math.random() * 80 + 10 + "%";
+            ripple.style.top = Math.random() * 80 + 10 + "%";
+            ripple.style.width = (Math.random() * 20 + 12) + "px";
+            ripple.style.height = (Math.random() * 6 + 3) + "px";
+            ripple.style.animationDelay = (Math.random() * 1.5) + "s";
+            ripple.style.animationDuration = (Math.random() * 0.4 + 0.5) + "s";
+            overlay.appendChild(ripple);
+        }
+        
+        if (hudIcon) hudIcon.innerHTML = '<i class="fas fa-cloud-showers-heavy text-blue-300"></i>';
+        if (hudText) hudText.innerText = ltrConvertWeatherText("rainy");
+        if (moistureEl) {
+            moistureEl.innerHTML = "رطوبة مثالية: 100% 🌧️";
+            moistureEl.className = "text-[10px] text-blue-200 bg-black/50 border border-blue-500/20 px-2.5 py-1 rounded-full font-bold shadow";
+        }
+    } 
+    else if (weather === "cloudy_mist") {
+        // Thin layer of fog/mist
+        const mist = document.createElement("div");
+        mist.className = "fog-mist-layer";
+        overlay.appendChild(mist);
+        
+        // Moving cloud icons
+        for (let i = 0; i < 2; i++) {
+            const cloud = document.createElement("div");
+            cloud.innerText = "☁️";
+            cloud.className = "absolute text-zinc-100 opacity-20 text-3xl pointer-events-none";
+            cloud.style.top = (Math.random() * 40 + 10) + "px";
+            cloud.style.left = (Math.random() * 80) + "%";
+            cloud.style.animation = "fogSwayAnimation 25s ease-in-out infinite alternate";
+            if (i === 1) cloud.style.animationDelay = "5s";
+            overlay.appendChild(cloud);
+        }
+        
+        if (hudIcon) hudIcon.innerHTML = '<i class="fas fa-cloud text-slate-300"></i>';
+        if (hudText) hudText.innerText = "ضباب وغيوم";
+        if (moistureEl) {
+            moistureEl.innerHTML = "تربة رطبة: 90% 🌫️";
+            moistureEl.className = "text-[10px] text-zinc-300 bg-black/50 border border-zinc-500/20 px-2.5 py-1 rounded-full font-bold shadow";
+        }
+    } 
+    else if (weather === "thunderstorm") {
+        // Heavy vertical thunderstorms
+        for (let i = 0; i < 50; i++) {
+            const drop = document.createElement("div");
+            drop.className = "rain-drop";
+            drop.style.left = Math.random() * 100 + "%";
+            drop.style.top = (Math.random() * -15) + "%";
+            drop.style.animationDelay = (Math.random() * 0.9) + "s";
+            drop.style.animationDuration = (Math.random() * 0.3 + 0.4) + "s";
+            overlay.appendChild(drop);
+        }
+        
+        if (hudIcon) hudIcon.innerHTML = '<i class="fas fa-bolt text-amber-300 animate-pulse"></i>';
+        if (hudText) hudText.innerText = "عاصفة رعدية";
+        if (moistureEl) {
+            moistureEl.innerHTML = "إشباع فائق: 100% ⛈️";
+            moistureEl.className = "text-[10px] text-teal-200 bg-black/50 border border-teal-500/20 px-2.5 py-1 rounded-full font-bold shadow";
+        }
+    }
+}
+
+function ltrConvertWeatherText(type) {
+    if (type === "rainy") {
+        return window.isFarmNight ? "ليل ممطر" : "مطر منعش";
+    }
+    return "مطر منعش";
+}
+
+function cycleWeatherState() {
+    const states = ["sunny", "rainy", "cloudy_mist", "thunderstorm"];
+    let currentIndex = states.indexOf(window.currentWeather);
+    let nextIndex = (currentIndex + 1) % states.length;
+    window.currentWeather = states[nextIndex];
+    
+    applyWeatherEffects();
+    
+    const isNight = window.isFarmNight === true;
+    const messages = {
+        sunny: isNight ? "بزوغ سماء ليل القرية الصافية المليئة بالنجوم المتلألئة ✨🌙" : "شمس ساطعة تنير سنابل القمح الذهبية ☀️",
+        rainy: isNight ? "زخات مطر ليلية دافئة تداعب تربة المزرعة 🌧️🌙" : "أمطار دافئة تروي المزروعات (سرعة نمو البذور +25%) 🌧️🌾",
+        cloudy_mist: "ضباب صباحي مريح يغطي ربوع المحاصيل 🌫️🌿",
+        thunderstorm: "عاصفة رعدية تغذي المياه الجوفية وحقول المزرعة! ⛈️🌱"
+    };
+    
+    showToast(messages[window.currentWeather]);
+}
+
+// ==========================================
+// DYNAMIC SOUND EFFECTS SYNTHESIZER ENGINE
+// ==========================================
+const GameAudio = {
+    ctx: null,
+
+    init() {
+        if (!this.ctx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                this.ctx = new AudioContextClass();
+            }
+        }
+        if (this.ctx && this.ctx.state === "suspended") {
+            this.ctx.resume();
+        }
+    },
+
+    playClick() {
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(550, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.08);
+            
+            gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+            
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.08);
+        } catch (e) {
+            console.error("Audio error:", e);
+        }
+    },
+
+    playSuccess() {
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const notes = [261.63, 329.63, 392.00, 523.25]; // Melodic C-E-G-C major chord
+            
+            notes.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+                
+                gain.gain.setValueAtTime(0.06, now + idx * 0.07);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.15);
+                
+                osc.start(now + idx * 0.07);
+                osc.stop(now + idx * 0.07 + 0.15);
+            });
+        } catch (e) {
+            console.error("Audio error:", e);
+        }
+    },
+
+    playHarvest() {
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const notes = [440.00, 554.37, 659.25, 880.00]; // Energetic A-C#-E-A sweep
+            
+            notes.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+                
+                gain.gain.setValueAtTime(0.05, now + idx * 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.12);
+                
+                osc.start(now + idx * 0.05);
+                osc.stop(now + idx * 0.05 + 0.12);
+            });
+        } catch (e) {
+            console.error("Audio error:", e);
+        }
+    }
+};
+
+// Global click interaction trigger to unlock Audio context safely on Android/Web platforms
+document.addEventListener("click", () => {
+    GameAudio.init();
+});
