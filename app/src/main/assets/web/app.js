@@ -84,6 +84,13 @@ document.addEventListener("DOMContentLoaded", () => {
     initGameLoops();
     initWeatherSystem();
     renderAll();
+
+    // Register Service Worker for Progressive Web App (PWA)
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js")
+            .then(reg => console.log("Service Worker registered with scope:", reg.scope))
+            .catch(err => console.error("Service Worker registration failed:", err));
+    }
 });
 
 // Load local save from LocalStorage
